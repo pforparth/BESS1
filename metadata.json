@@ -1,0 +1,6 @@
+{
+  "name": "Battery Energy Storage System Hub",
+  "description": "An interactive explanation, simulation, sizing calculator, and AI support assistant for Battery Energy Storage Systems (BESS) demonstrating energy integration, peak shaving, and demand matching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
