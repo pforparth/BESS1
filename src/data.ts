@@ -1,6 +1,6 @@
 import { BatteryChemistry, SimulationHourData, SimulationParameters, BessManufacturer } from "./types";
 
-// Indian BESS manufacturers directory for B2B Sourcing / Trading business
+// Indian BESS manufacturers directory for B2B Sourcing & Technical Integration
 export const INDIAN_BESS_MANUFACTURERS: BessManufacturer[] = [
   {
     id: "reliance-new-energy",
@@ -12,7 +12,7 @@ export const INDIAN_BESS_MANUFACTURERS: BessManufacturer[] = [
     bestFitUse: "Utility-scale power grids, ultra-fast EV charging plazas, national grid backup.",
     tradingAdvantage: "Extremely competitive container prices due to massive domestic vertically-integrated supply chains.",
     representativeModel: "Reliance OptiGrid-5 containerized system",
-    description: "Operating India's largest planned energy storage gigacomplex. Perfect vendor choice for bulk trading to state DISCOMs or large independent solar developers.",
+    description: "Operating India's largest planned energy storage gigacomplex. Perfect vendor choice for bulk deployment to state DISCOMs or large independent solar developers.",
     tierRating: "Tier-1 Partner"
   },
   {
@@ -49,7 +49,7 @@ export const INDIAN_BESS_MANUFACTURERS: BessManufacturer[] = [
     chemistryFocus: "Heavy-Cycle Lithium Iron Phosphate (LFP) & Advanced VRLA",
     annualCapacityGwh: 8,
     bestFitUse: "Solar farm co-location, manufacturing workshops, hospital backup microgrids.",
-    tradingAdvantage: "Flexible container configurations allowing customization for medium-sized enterprises (MMEs), offering higher trading margins.",
+    tradingAdvantage: "Flexible container configurations allowing customization for medium-sized enterprises (MMEs), offering superior techno-economic scaling.",
     representativeModel: "Amaron GigaVolt-C1 (2 MWh Container Series)",
     description: "Makers of the famous Amaron brand. Setting up Telangana's premier BESS gigafactory with advanced active-cooling management designs.",
     tierRating: "Tier-1 Partner"
@@ -62,7 +62,7 @@ export const INDIAN_BESS_MANUFACTURERS: BessManufacturer[] = [
     chemistryFocus: "Multi-Chemistry customized integration (LFP/Flow Systems)",
     annualCapacityGwh: 3,
     bestFitUse: "Mega Smart Cities, State transmission substations, hybrid wind-solar parks.",
-    tradingAdvantage: "Heavy industrial EPC engineering capabilities. Ideal partner for complex, custom tender-bidding trading projects.",
+    tradingAdvantage: "Heavy industrial EPC engineering capabilities. Ideal partner for complex, custom tender-bidding integration projects.",
     representativeModel: "L&T Megastruct Substation Array (10 MWh+)",
     description: "The engineering landmark for Indian infrastructure. Acts as a premier turn-key system aggregator and EPC partner for grand utilities.",
     tierRating: "Specialist Manufacturer"
@@ -77,7 +77,7 @@ export const INDIAN_BESS_MANUFACTURERS: BessManufacturer[] = [
     bestFitUse: "Solar farm developers, multi-state commercial operations, high-end agricultural nodes.",
     tradingAdvantage: "Turnkey developer integration with global technology benchmarks, catering to custom boutique requirements.",
     representativeModel: "S&W SunStoring Container (1 MWh - 5 MWh)",
-    description: "Global solar-EPC leader based in India. They act as exceptional orchestrators, helping traders supply vetted systems to private C&I clients.",
+    description: "Global solar-EPC leader based in India. They act as exceptional orchestrators, helping key stakeholders supply vetted systems to private C&I clients.",
     tierRating: "Specialist Manufacturer"
   }
 ];
@@ -267,7 +267,7 @@ export function runBessSimulation(params: SimulationParameters): SimulationHourD
 // Custom India-focused questions
 export const FAQ_PROMPTS = [
   "Who are the top tier BESS manufacturers supplying in India?",
-  "How can a trading/distributor business earn high margins with BESS?",
+  "What are the main techno-economic drivers of battery storage payback in India?",
   "What is the average ROI of BESS for an Indian textile mill?",
   "How does BESS solve grid voltage sag issues in Noida/Gujarat industrial zones?",
   "Which battery chemistry is best suited for 45°C Indian summers?"

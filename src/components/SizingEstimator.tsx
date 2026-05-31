@@ -337,7 +337,7 @@ export default function SizingEstimator() {
                       ~ {result.roiYears || 6} Years
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400">Payback with smart trading margins</p>
+                  <p className="text-[10px] text-slate-400">Payback estimate based on current regional tariffs</p>
                 </div>
               </div>
 
