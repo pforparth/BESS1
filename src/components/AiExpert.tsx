@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { FAQ_PROMPTS } from "../data";
 import { ChatMessage } from "../types";
 import { 
@@ -8,7 +8,8 @@ import {
   User, 
   Trash2, 
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  Database
 } from "lucide-react";
 
 export default function AiExpert() {
@@ -23,6 +24,7 @@ export default function AiExpert() {
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +34,30 @@ export default function AiExpert() {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadStatus("Uploading & parsing PDF...");
+    const formData = new FormData();
+    formData.append("pdf", file);
+
+    try {
+      const res = await fetch("/api/upload-pdf", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUploadStatus(`Success! Vectorized into ${data.chunksCount} chunks.`);
+      } else {
+        setUploadStatus(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      setUploadStatus(`Upload failed: ${err.message}`);
+    }
+  };
 
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim() || loading) return;
@@ -194,6 +220,24 @@ export default function AiExpert() {
                 </button>
               ))}
             </div>
+          </div>
+          
+          {/* Vector Knowledge Upload */}
+          <div className="glass-panel p-4 rounded-2xl space-y-3 bg-white border-slate-200 shadow-sm mt-4">
+            <h4 className="text-xs uppercase tracking-wider text-slate-500 font-mono flex items-center gap-1.5">
+              <Database className="w-4 h-4 text-emerald-600" />
+              Upload PDF Context (RAG)
+            </h4>
+            <p className="text-[11px] text-slate-555 leading-relaxed">
+              Feed MNRE guidelines or battery manuals directly into the AI's vector store.
+            </p>
+            <input 
+              type="file" 
+              accept="application/pdf"
+              className="text-xs w-full block border p-1 rounded-lg border-slate-200 cursor-pointer bg-slate-50 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              onChange={handleFileUpload}
+            />
+            {uploadStatus && <div className="text-[10px] text-emerald-650 font-mono mt-1 bg-emerald-50 p-2 rounded border border-emerald-100">{uploadStatus}</div>}
           </div>
         </div>
 

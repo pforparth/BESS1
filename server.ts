@@ -3,14 +3,85 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import multer from "multer";
+// @ts-expect-error Types missing default
+import pdfParse from "pdf-parse";
 
 dotenv.config();
+
+// In-Memory Vector Store for RAG
+interface DocChunk {
+    text: string;
+    embedding: number[];
+}
+let vectorStore: DocChunk[] = [];
+
+// Cosine similarity
+function cosineSimilarity(vecA: number[], vecB: number[]) {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // PDF Upload Route
+  app.post("/api/upload-pdf", upload.single("pdf"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+      const data = await pdfParse(req.file.buffer);
+      const text = data.text;
+      
+      // Basic text chunking
+      const chunks: string[] = [];
+      const MAX_CHUNK_SIZE = 1000;
+      let currentIndex = 0;
+      while (currentIndex < text.length) {
+        chunks.push(text.slice(currentIndex, currentIndex + MAX_CHUNK_SIZE));
+        currentIndex += MAX_CHUNK_SIZE;
+      }
+      
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(400).json({ error: "GEMINI_API_KEY is missing." });
+      
+      const ai = new GoogleGenAI({ apiKey });
+      const newChunks: DocChunk[] = [];
+      
+      // Sequentially generate embeddings to respect rate limits
+      for (const chunk of chunks) {
+        if (!chunk.trim()) continue;
+        const response = await ai.models.embedContent({
+          model: "gemini-embedding-2-preview",
+          contents: chunk
+        });
+        const embedding = response.embeddings?.[0]?.values;
+        if (embedding) {
+            newChunks.push({ text: chunk, embedding });
+        }
+      }
+      
+      vectorStore.push(...newChunks);
+      
+      res.json({ success: true, chunksCount: newChunks.length, totalChunks: vectorStore.length });
+    } catch (e: any) {
+      console.error("PDF upload error:", e);
+      res.status(500).json({ error: e.message || "Failed to process PDF" });
+    }
+  });
 
   // API Route - Chat with Gemini BESS Expert
   app.post("/api/chat", async (req, res) => {
@@ -33,6 +104,32 @@ async function startServer() {
         }
       });
 
+      // RAG Retrieval
+      let retrievedContext = "";
+      if (vectorStore.length > 0) {
+        try {
+            const embedRes = await ai.models.embedContent({
+                model: "gemini-embedding-2-preview",
+                contents: message
+            });
+            const queryEmbedding = embedRes.embeddings?.[0]?.values;
+            if (queryEmbedding) {
+                // Calculate scores
+                const scoredDocs = vectorStore.map(doc => ({
+                    text: doc.text,
+                    score: cosineSimilarity(queryEmbedding, doc.embedding)
+                }));
+                // Sort descending
+                scoredDocs.sort((a, b) => b.score - a.score);
+                // Take top 3 chunks
+                const topDocs = scoredDocs.slice(0, 3);
+                retrievedContext = "Relevant Document Excerpts:\n" + topDocs.map(d => "---\n" + d.text + "\n---").join("\n");
+            }
+        } catch (err) {
+            console.error("RAG Retrieval error:", err);
+        }
+      }
+
       // Prepare contents containing history + current message
       const contents: any[] = [];
       
@@ -54,14 +151,14 @@ async function startServer() {
         model: "gemini-3.5-flash",
         contents,
         config: {
-          systemInstruction: `You are highly knowledgeable, professional BESS India Trading Advisor. Your goal is to help BESS traders, end-user entities, and C&I facility managers in India configure and buy optimal storage systems from domestic manufacturers.
-You can discuss:
-1. Sourcing Partnerships: Major domestic players such as Reliance New Energy, Tata AutoComp Systems, Exide Energy Solutions, Amara Raja, Sterling & Wilson, and L&T Green Energy. Explain how traders can work with them.
-2. Battery Chemistries simplified: Lithium-Iron Phosphate [LFP] (preferred for high-temperature Indian climates safe up to 270°C), Sodium-ion [Na-ion] (cost-effective for microgrids), Vanadium Redox Flow [VRFB], and NMC (hazardous high-temp runaway risk at 210°C).
-3. Strategic Dispatch Tactics (Peak Shaving under State DISCOM tariffs like BESCOM, MSEDCL, TANGEDCO; solar storage absorption; and diesel generator replacement offsets).
-4. Core Tech metrics: Round-Trip Efficiency (RTE), cycle lifetimes, and LCOS (Levelized Cost of Storage in Rupees/unit).
-
-Give crisp, structured answers using Markdown bullet points. Keep explanations extremely simple and non-technical for end-user business managers. Keep responses under 2-3 short paragraphs.`,
+          systemInstruction: "You are highly knowledgeable, professional BESS India Trading Advisor. Your goal is to help BESS traders, end-user entities, and C&I facility managers in India configure and buy optimal storage systems from domestic manufacturers.\n" +
+"You can discuss:\n" +
+"1. Sourcing Partnerships: Major domestic players such as Reliance New Energy, Tata AutoComp Systems, Exide Energy Solutions, Amara Raja, Sterling & Wilson, and L&T Green Energy. Explain how traders can work with them.\n" +
+"2. Battery Chemistries simplified: Lithium-Iron Phosphate [LFP] (preferred for high-temperature Indian climates safe up to 270°C), Sodium-ion [Na-ion] (cost-effective for microgrids), Vanadium Redox Flow [VRFB], and NMC (hazardous high-temp runaway risk at 210°C).\n" +
+"3. Strategic Dispatch Tactics (Peak Shaving under State DISCOM tariffs like BESCOM, MSEDCL, TANGEDCO; solar storage absorption; and diesel generator replacement offsets).\n" +
+"4. Core Tech metrics: Round-Trip Efficiency (RTE), cycle lifetimes, and LCOS (Levelized Cost of Storage in Rupees/unit).\n\n" +
+(retrievedContext ? "IMPORTANT: Use the following retrieved document excerpts to inform your answer. If they contain relevant information, synthesize it into your response.\n" + retrievedContext + "\n\n" : "") +
+"Give crisp, structured answers using Markdown bullet points. Keep explanations extremely simple and non-technical for end-user business managers. Keep responses under 2-3 short paragraphs.",
           temperature: 0.7,
         },
       });
