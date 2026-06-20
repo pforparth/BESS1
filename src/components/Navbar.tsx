@@ -7,11 +7,11 @@ interface NavbarProps {
 
 export default function Navbar({ activeSection, setActiveSection }: NavbarProps) {
   const navItems = [
-    { id: "learning", label: "Learning Hub", icon: BookOpen },
-    { id: "simulator", label: "Grid Simulation", icon: Zap },
-    { id: "chemistry", label: "Sourcing & Tech", icon: BatteryCharging },
+    { id: "learning", label: "Interactive Guide", icon: BookOpen },
+    { id: "simulator", label: "Live Simulator", icon: Zap },
+    { id: "chemistry", label: "Sourcing Directory", icon: BatteryCharging },
     { id: "sizing", label: "Sizing Calculator", icon: Cpu },
-    { id: "ai-expert", label: "AI Specialist", icon: HardHat },
+    { id: "ai-expert", label: "Ask AI Assistant", icon: HardHat },
   ];
 
   return (

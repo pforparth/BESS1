@@ -50,7 +50,7 @@ export default function AiExpert() {
       });
       const data = await res.json();
       if (res.ok) {
-        setUploadStatus(`Success! Vectorized into ${data.chunksCount} chunks.`);
+        setUploadStatus(data.message || `Success! Vectorized into ${data.chunksCount} chunks.`);
       } else {
         setUploadStatus(`Error: ${data.error}`);
       }

@@ -4,8 +4,38 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import multer from "multer";
-// @ts-expect-error Types missing default
-import pdfParse from "pdf-parse";
+import pdfParseModule from "pdf-parse";
+
+let loadedPdfParse: any = null;
+async function parsePdfBuffer(buffer: Buffer): Promise<any> {
+    if (!loadedPdfParse) {
+        if (typeof pdfParseModule === "function") {
+            loadedPdfParse = pdfParseModule;
+        } else if (pdfParseModule && typeof (pdfParseModule as any).default === "function") {
+            loadedPdfParse = (pdfParseModule as any).default;
+        } else {
+            try {
+                const imported = await import("pdf-parse");
+                loadedPdfParse = imported.default || imported;
+                if (typeof loadedPdfParse !== "function" && (loadedPdfParse as any).default) {
+                    loadedPdfParse = (loadedPdfParse as any).default;
+                }
+            } catch (err) {
+                console.warn("Dynamic import of pdf-parse failed:", err);
+            }
+        }
+    }
+    
+    if (typeof loadedPdfParse !== "function") {
+        loadedPdfParse = pdfParseModule;
+    }
+    
+    if (typeof loadedPdfParse !== "function") {
+        throw new Error("PDF parser loading failed. Resolved object is not a function.");
+    }
+    
+    return await loadedPdfParse(buffer);
+}
 
 dotenv.config();
 
@@ -38,17 +68,27 @@ async function startServer() {
 
   app.use(express.json());
 
+  app.get("/api/debug-server", (req, res) => {
+    res.json({
+      time: new Date(),
+      hasParsePdfBuffer: typeof parsePdfBuffer === "function",
+      pdfParseModuleType: typeof pdfParseModule,
+      message: "Hello from newly compiled server!"
+    });
+  });
+
   // PDF Upload Route
   app.post("/api/upload-pdf", upload.single("pdf"), async (req, res) => {
     try {
+      console.log("=== API UPLOAD-PDF HIT ===");
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-      const data = await pdfParse(req.file.buffer);
+      const data = await parsePdfBuffer(req.file.buffer);
       const text = data.text;
       
       // Basic text chunking
       const chunks: string[] = [];
-      const MAX_CHUNK_SIZE = 1000;
+      const MAX_CHUNK_SIZE = 25000;
       let currentIndex = 0;
       while (currentIndex < text.length) {
         chunks.push(text.slice(currentIndex, currentIndex + MAX_CHUNK_SIZE));
@@ -61,11 +101,17 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey });
       const newChunks: DocChunk[] = [];
       
+      // Limit to first 25 chunks to guarantee sub-15s response times on large documents
+      const activeChunks = chunks.slice(0, 25);
+      console.log(`Processing ${activeChunks.length} chunks (from total of ${chunks.length}) for embeddings...`);
+      
       // Sequentially generate embeddings to respect rate limits
-      for (const chunk of chunks) {
+      for (let i = 0; i < activeChunks.length; i++) {
+        const chunk = activeChunks[i];
         if (!chunk.trim()) continue;
+        console.log(`Embedding chunk ${i + 1} of ${activeChunks.length}...`);
         const response = await ai.models.embedContent({
-          model: "gemini-embedding-2-preview",
+          model: "gemini-embedding-2",
           contents: chunk
         });
         const embedding = response.embeddings?.[0]?.values;
@@ -76,10 +122,15 @@ async function startServer() {
       
       vectorStore.push(...newChunks);
       
-      res.json({ success: true, chunksCount: newChunks.length, totalChunks: vectorStore.length });
+      res.json({ 
+        success: true, 
+        chunksCount: newChunks.length, 
+        totalChunks: vectorStore.length,
+        message: chunks.length > 25 ? `Large PDF detected (${chunks.length} total sections). Successfully memorized and vectorized the primary 25 sections for AI reference.` : undefined
+      });
     } catch (e: any) {
       console.error("PDF upload error:", e);
-      res.status(500).json({ error: e.message || "Failed to process PDF" });
+      res.status(500).json({ error: e.message || "Failed to process PDF", stack: e.stack });
     }
   });
 
@@ -109,7 +160,7 @@ async function startServer() {
       if (vectorStore.length > 0) {
         try {
             const embedRes = await ai.models.embedContent({
-                model: "gemini-embedding-2-preview",
+                model: "gemini-embedding-2",
                 contents: message
             });
             const queryEmbedding = embedRes.embeddings?.[0]?.values;
